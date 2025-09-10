@@ -1,0 +1,36 @@
+# Node / Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/.vite/
+*.log
+
+# Python / Backend
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/*.db
+
+# Docker
+**/.dockerignore
+*.pid
+*.seed
+.docker/
+docker-compose.override.yml
+
+# Env & secrets
+.env
+*.env
+backend/.env
+frontend/.env
+
+# OS / Editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Generated archives
+*.zip

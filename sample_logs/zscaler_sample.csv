@@ -1,0 +1,10 @@
+time,src_ip,user,url,action,status,bytes,user_agent
+2025-09-08T12:00:01,10.0.0.5,alice,https://example.com/index,allow,200,1234,Mozilla/5.0
+2025-09-08T12:00:15,10.0.0.5,alice,https://example.com/api,allow,200,2048,Mozilla/5.0
+2025-09-08T12:01:00,10.0.0.5,alice,https://example.com/api,allow,500,2048,Mozilla/5.0
+2025-09-08T12:01:05,10.0.0.5,alice,https://example.com/api,allow,500,2048,Mozilla/5.0
+2025-09-08T12:01:10,10.0.0.5,alice,https://example.com/api,allow,500,2048,Mozilla/5.0
+2025-09-08T12:02:10,10.0.0.8,bob,https://weird.example.net/x,block,403,1024,OddCrawler/0.1
+2025-09-08T12:02:12,10.0.0.8,bob,https://weird.example.net/y,block,403,1024,OddCrawler/0.1
+2025-09-08T12:02:14,10.0.0.8,bob,https://weird.example.net/z,block,403,1024,OddCrawler/0.1
+2025-09-08T12:03:00,10.0.0.9,charlie,https://example.com/index,allow,200,512,Mozilla/5.0

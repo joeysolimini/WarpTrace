@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --warp-grad: radial-gradient(1200px 800px at 10% 10%, #1f0a39 0%, transparent 60%),
+              radial-gradient(900px 600px at 90% 20%, #270c4d 0%, transparent 60%),
+              radial-gradient(1000px 700px at 50% 80%, #150a2a 0%, transparent 60%);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  @apply font-sans text-gray-100;
+  background: linear-gradient(180deg, #1f0a39, #270c4d), var(--warp-grad);
+  background-attachment: fixed;
+}
+
+.warp-card {
+  @apply rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-lg;
+}
+
+.warp-btn {
+  @apply relative inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold border border-white/10;
+  background: transparent;
+  overflow: hidden;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  isolation: isolate;    /* creates a new stacking context */
+  color: #fff;           /* keep text visible on the neon gradient */
+}
+.warp-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff2fa1, #c026d3, #7c3aed);
+  transform: translateZ(0);
+  pointer-events: none;
+  z-index: -1;           /* behind the text thanks to isolation */
+}
+
+
+.warp-btn:hover::before { filter: brightness(1.08); }
+.warp-btn:focus-visible { box-shadow: 0 0 0 2px rgba(232,121,249,.45); }
+.warp-subtle {
+  @apply text-sm text-white/70;
+}
+
+.warp-section-title {
+  @apply text-sm tracking-widest uppercase font-semibold text-white/70;
+  letter-spacing: 0.2em;
+}
+
+/* === Warptrace progress visuals === */
+.warp-track {
+  position: relative;
+  width: 100%;
+  height: 12px; /* a touch taller looks better */
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(2px);
+}
+
+.warp-starfield {
+  position: absolute; inset: 0;
+  opacity: 0.18; pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 35%, rgba(255,255,255,0.9) 0, transparent 60%),
+    radial-gradient(1px 1px at 44% 62%, rgba(255,255,255,0.6) 0, transparent 60%),
+    radial-gradient(1px 1px at 73% 28%, rgba(255,255,255,0.7) 0, transparent 60%),
+    radial-gradient(1px 1px at 85% 70%, rgba(255,255,255,0.5) 0, transparent 60%),
+    radial-gradient(1px 1px at 30% 80%, rgba(255,255,255,0.65) 0, transparent 60%);
+  will-change: transform;
+  animation: starDrift 12s linear infinite;
+}
+
+@keyframes starDrift {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-40px); }
+}
+
+.warp-bar {
+  position: relative;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #ff2fa1, #c026d3, #7c3aed);
+  box-shadow: 0 0 20px rgba(255, 47, 161, 0.35);
+  overflow: hidden;
+}
+
+.warp-shimmer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);
+  background-size: 220% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.35;
+  will-change: background-position;
+  animation: warpSlide 2.3s linear infinite;
+}
+
+@keyframes warpSlide {
+  0%   { background-position: -120% 0; }
+  100% { background-position: 120% 0; }
+}
+
+/* tiny comet at the leading edge */
+.warp-comet {
+  position: absolute;
+  top: 50%; right: -6px;
+  width: 12px; height: 12px;
+  transform: translateY(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 30% 30%, #ffffff, rgba(255,255,255,0.25) 40%, transparent 70%);
+  filter: drop-shadow(0 0 10px rgba(255, 47, 161, 0.85));
+  will-change: transform;
+  animation: cometPulse 1.25s ease-in-out infinite;
+}
+
+@keyframes cometPulse {
+  0%, 100% { transform: translateY(-50%) scale(0.92); opacity: 0.95; }
+  50%      { transform: translateY(-50%) scale(1.0);  opacity: 1; }
+}
+
+.backdrop-blur-md {
+  backdrop-filter: blur(10px);
+}
