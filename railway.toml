@@ -1,0 +1,39 @@
+[project]
+name = "warptrace"
+
+# -------------------------
+# Backend: Flask (Gunicorn)
+# -------------------------
+[services.backend]
+rootDirectory   = "backend"
+installCommand  = "pip install --no-cache-dir -r requirements.txt"
+# Gunicorn binds to Railway's $PORT
+startCommand    = "gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT app:app"
+healthCheckPath = "/api/health"
+healthCheckTimeout = 10
+
+[services.backend.env]
+FLASK_ENV = "production"
+JWT_SECRET = "change-me"
+LLM_ENABLED = "true"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_APP_NAME = "WarpTrace"
+# Set this AFTER frontend deploys to your Railway frontend URL
+OPENROUTER_SITE_URL = ""
+# Pick your model, or keep auto:
+LLM_MODEL = "openrouter/auto"
+# DATABASE_URL will be injected automatically when you link the Railway Postgres plugin
+
+# -------------------------
+# Frontend: Vite (React)
+# -------------------------
+[services.frontend]
+rootDirectory  = "frontend"
+installCommand = "npm ci"
+buildCommand   = "npm run build"
+# Simple prod server via Vite preview (fine for demos)
+startCommand   = "npm run preview -- --host 0.0.0.0 --port $PORT"
+
+[services.frontend.env]
+# Replace AFTER backend deploys (public URL of the backend service)
+VITE_API_BASE = "https://<your-backend-service>.up.railway.app"
