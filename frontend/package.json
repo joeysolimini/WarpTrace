@@ -4,9 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "vite --host",
+    "build": "vite build",
+    "start": "vite preview --host 0.0.0.0 --strictPort --port ${PORT:-5173}",
+    "preview": "vite preview --host 0.0.0.0 --strictPort --port ${PORT:-5173}"
   },
   "dependencies": {
     "react": "^18.3.1",
