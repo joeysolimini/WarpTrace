@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 import traceback
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
@@ -14,26 +15,44 @@ from summarizer import summarize_anomaly, summarize_log  # NEW
 
 app = Flask(__name__)
 
-def init_db_with_retry(max_attempts=40, delay=1.5):
-    for i in range(max_attempts):
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            Base.metadata.create_all(bind=engine)
-            # add columns we need for LLM caching (safe if they already exist)
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    ALTER TABLE uploads
-                    ADD COLUMN IF NOT EXISTS ai_summary TEXT,
-                    ADD COLUMN IF NOT EXISTS ai_summary_model VARCHAR(120),
-                    ADD COLUMN IF NOT EXISTS ai_summary_at TIMESTAMPTZ
-                """))
-            print("✅ Database ready; tables ensured.")
-            return
-        except Exception as e:
-            print(f"⏳ Waiting for database... ({i+1}/{max_attempts}) {e}")
-            time.sleep(delay)
-    raise RuntimeError("Database not reachable after retries")
+# ---------- Async DB warmup so the server can start immediately ----------
+DB_READY = False
+
+def ensure_db_async(max_attempts: int = 60, delay: float = 1.5):
+    """Warm DB + ensure tables/columns in a background thread (non-blocking)."""
+    def worker():
+        nonlocal max_attempts, delay
+        global DB_READY
+        for i in range(max_attempts):
+            try:
+                # connectivity
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+
+                # tables
+                Base.metadata.create_all(bind=engine)
+
+                # columns used for LLM summary cache (idempotent)
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        ALTER TABLE uploads
+                        ADD COLUMN IF NOT EXISTS ai_summary TEXT,
+                        ADD COLUMN IF NOT EXISTS ai_summary_model VARCHAR(120),
+                        ADD COLUMN IF NOT EXISTS ai_summary_at TIMESTAMPTZ
+                    """))
+
+                app.logger.info("✅ Database ready; tables/columns ensured.")
+                DB_READY = True
+                return
+            except Exception as e:
+                app.logger.warning(f"⏳ Waiting for database... ({i+1}/{max_attempts}) {e}")
+                time.sleep(delay)
+        app.logger.error("🚫 Database not reachable after retries")
+
+    threading.Thread(target=worker, daemon=True).start()
+
+# kick off the background warmup (do NOT block startup)
+ensure_db_async()
 
 # CORS (Auth header + multipart)
 CORS(
@@ -44,8 +63,6 @@ CORS(
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["Authorization", "Content-Type"],
 )
-
-init_db_with_retry()
 
 # ---------- helpers ----------
 def set_state(dbsess, upload_id: int, *, status: str | None = None, progress: int | None = None):
@@ -139,7 +156,7 @@ def _group_anomalies(rich_anoms, id_to_event):
                     bucket["samples"].append(id_to_event[eid])
     # finalize structures
     out = []
-    for k, v in g.items():
+    for _, v in g.items():
         out.append({
             "kind": v["kind"],
             "count": v["count"],
@@ -148,7 +165,6 @@ def _group_anomalies(rich_anoms, id_to_event):
             "src_ips": sorted(v["src_ips"])[:10],
             "samples": v["samples"][:25],
         })
-    # sort by count desc
     out.sort(key=lambda x: x["count"], reverse=True)
     return out
 
@@ -212,7 +228,6 @@ def _process_analysis(upload_id: int):
         dbt.commit()
 
         # ---- Summarizing (single LLM call per upload) ----
-        # Build lightweight context for the summary
         id_to_event = {e.id: {
             "id": e.id,
             "ts": e.ts.isoformat() if e.ts else None,
@@ -220,7 +235,6 @@ def _process_analysis(upload_id: int):
             "action": e.action, "status": e.status, "bytes": e.bytes,
             "user_agent": e.user_agent, "raw": e.raw
         } for e in evs}
-
         grouped = _group_anomalies(found, id_to_event)
 
         # Simple per-minute timeline (counts only) for context
@@ -232,7 +246,7 @@ def _process_analysis(upload_id: int):
                 timeline[minute] += 1
         timeline_points = [{"minute": k, "count": v} for k, v in sorted(timeline.items())]
 
-        # Update status so the UI shows a bar during LLM call
+        # Show UI progress during LLM call
         set_state(dbt, upload_id, status="summarizing", progress=88)
 
         try:
@@ -248,13 +262,16 @@ def _process_analysis(upload_id: int):
         except Exception:
             ai_text = None
 
-        # Cache the overall summary (or leave null if disabled/failed)
-        u = dbt.get(Upload, upload_id)
-        u.ai_summary = ai_text
-        u.ai_summary_model = os.getenv("LLM_MODEL")
-        u.ai_summary_at = datetime.now(timezone.utc)
-        dbt.add(u)
-        dbt.commit()
+        # Cache the overall summary (guard if columns not ready yet)
+        try:
+            u = dbt.get(Upload, upload_id)
+            u.ai_summary = ai_text
+            u.ai_summary_model = os.getenv("LLM_MODEL")
+            u.ai_summary_at = datetime.now(timezone.utc)
+            dbt.add(u)
+            dbt.commit()
+        except Exception as e:
+            app.logger.warning(f"LLM summary cache skipped (columns not ready?): {e}")
 
         set_state(dbt, upload_id, status="done", progress=100)
 
@@ -271,7 +288,8 @@ def login():
 
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    # report DB readiness but always return 200 so Railway healthcheck passes quickly
+    return {"ok": True, "db": "ready" if DB_READY else "not_ready"}
 
 @app.route("/api/upload", methods=["OPTIONS"])
 def upload_options():
@@ -320,7 +338,6 @@ def analyze(upload_id: int):
     up.progress = 5
     db.add(up); db.commit(); db.close()
 
-    import threading
     threading.Thread(target=_process_analysis, args=(upload_id,), daemon=True).start()
     return {"upload_id": upload_id, "status": "processing", "progress": 5}, 202
 
@@ -388,8 +405,8 @@ def analysis(upload_id: int):
         "upload": {"id": up.id, "filename": up.filename, "created_at": up.created_at.isoformat()},
         "events": list(id_to_event.values()),
         "timeline": timeline_points,
-        "anomaly_groups": grouped,                  # <— use this on the UI
-        "summary": getattr(up, "ai_summary", None),                   # <— overall LLM summary (one call per upload)
+        "anomaly_groups": grouped,
+        "summary": getattr(up, "ai_summary", None),  # overall LLM summary (cached)
         "status": "done",
         "progress": 100,
     }
