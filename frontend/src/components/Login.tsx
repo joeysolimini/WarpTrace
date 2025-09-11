@@ -34,7 +34,6 @@ export default function Login({ onAuthed }: { onAuthed: (token: string) => void 
           {error && <div className="text-pink-300 text-sm">{error}</div>}
           <button className="warp-btn w-full disabled:opacity-60" disabled={loading}>{loading ? 'Warping…' : 'Enter Warptrace'}</button>
           <p className="warp-subtle">Demo creds pre-filled.</p>
-
         </form>
       </div>
     </div>
