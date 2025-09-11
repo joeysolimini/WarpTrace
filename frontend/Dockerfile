@@ -1,7 +1,15 @@
-FROM node:20-alpine
+# Build stage
+FROM node:lts-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install || true && npm ci || npm install
+COPY package*.json ./
+RUN npm ci
 COPY . .
-EXPOSE 5173
-CMD ["npm","run","dev","--","--host"]
+RUN npm run build
+
+# Runtime (static file server)
+FROM caddy:2
+WORKDIR /app
+COPY Caddyfile ./
+COPY --from=build /app/dist ./dist
+# Railway injects $PORT; Caddyfile uses it
+CMD ["caddy","run","--config","Caddyfile","--adapter","caddyfile"]
