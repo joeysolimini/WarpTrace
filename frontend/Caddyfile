@@ -1,0 +1,7 @@
+:{$PORT:3000} {
+  encode gzip
+  root * dist
+  file_server
+  # SPA fallback so /dashboard etc. don’t 404
+  try_files {path} /index.html
+}
